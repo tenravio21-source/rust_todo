@@ -38,9 +38,7 @@ async fn get_todo_list(pool: web::Data<SqlitePool>) -> impl Responder {
         .fetch_all(pool.get_ref())
         .await
         .unwrap();
-    let todo_json = serde_json::to_string(&todos).unwrap();
-
-    HttpResponse::Ok().body(todo_json)
+    web::Json(todos)
 }
 
 async fn add_todo(todo: Json<NewTodo>, pool: web::Data<SqlitePool>) -> impl Responder {
@@ -110,11 +108,14 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(Logger::default())
             .app_data(web::Data::new(pool.clone()))
-            .route("/todos", web::get().to(get_todo_list))
-            .route("/todos", web::post().to(add_todo))
-            .route("/todos/{id}", web::get().to(get_single_todo))
-            .route("/todos/{id}", web::put().to(update_todo))
-            .route("/todos/{id}", web::delete().to(delete_todo))
+            .service(
+                web::scope("/todos")
+                    .route("", web::get().to(get_todo_list))
+                    .route("", web::post().to(add_todo))
+                    .route("/{id}", web::get().to(get_single_todo))
+                    .route("/{id}", web::put().to(update_todo))
+                    .route("/{id}", web::delete().to(delete_todo)),
+            )
     })
     .bind("0.0.0.0:8080")
     .unwrap()
