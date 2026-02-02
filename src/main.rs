@@ -54,60 +54,50 @@ async fn add_todo(todo: Json<NewTodo>, pool: web::Data<SqlitePool>) -> impl Resp
 
 async fn get_single_todo(id: Path<i32>, pool: web::Data<SqlitePool>) -> impl Responder {
     let id = id.into_inner();
-    let row: Vec<Todo> = sqlx::query_as("SELECT * FROM todo WHERE id = ?1")
+    let row: Option<Todo> = sqlx::query_as("SELECT * FROM todo WHERE id = ?1")
         .bind(&id)
-        .fetch_all(pool.get_ref())
+        .fetch_optional(pool.get_ref())
         .await
         .unwrap();
 
-    if row.len() == 0 {
-        HttpResponse::NotFound().body("Not Found")
-    } else {
-        let todo_json = serde_json::to_string(&row[0]).unwrap();
-        HttpResponse::Ok().body(todo_json)
+    match row {
+        Some(todo) => HttpResponse::Ok().body(serde_json::to_string(&todo).unwrap()),
+        None => HttpResponse::NotFound().body("Not Found"),
     }
 }
 
 async fn update_todo(
     id: Path<i32>,
-    todo: Json<NewTodo>,
     pool: web::Data<SqlitePool>,
+    todo: Json<NewTodo>,
 ) -> impl Responder {
-    let id = id.into_inner();
-    let row: Vec<Todo> = sqlx::query_as("SELECT * FROM todo WHERE id = ?1")
-        .bind(&id)
-        .fetch_all(pool.get_ref())
+    let result = sqlx::query("UPDATE todo SET content = ?1 WHERE id = ?2")
+        .bind(&todo.content)
+        .bind(id.into_inner())
+        .execute(pool.get_ref())
         .await
         .unwrap();
-    if row.len() == 0 {
-        return HttpResponse::NotFound().body("Not Found");
+
+    if result.rows_affected() == 0 {
+        HttpResponse::NotFound().body("Todo not found")
     } else {
-        sqlx::query("UPDATE todo SET content = ?1 WHERE id = ?2")
-            .bind(&todo.content)
-            .bind(&id)
-            .execute(pool.get_ref())
-            .await
-            .unwrap();
-        HttpResponse::Ok().body("OK")
+        HttpResponse::Ok().body("Todo Updated")
     }
 }
-
 async fn delete_todo(id: Path<i32>, pool: web::Data<SqlitePool>) -> impl Responder {
     let id = id.into_inner();
-    let row: Vec<Todo> = sqlx::query_as("SELECT * FROM todo WHERE id = ?1")
+
+    let result = sqlx::query("DELETE FROM todo WHERE id = ?1")
         .bind(&id)
-        .fetch_all(pool.get_ref())
+        .execute(pool.get_ref())
         .await
         .unwrap();
-    if row.len() == 0 {
-        return HttpResponse::NotFound().body("Not Found");
+
+    if result.rows_affected() == 0 {
+        let msg = format!("No Todo with id: {} found!", id);
+        HttpResponse::NotFound().body(msg)
     } else {
-        sqlx::query("DELETE FROM todo WHERE id = ?1")
-            .bind(&id)
-            .execute(pool.get_ref())
-            .await
-            .unwrap();
-        HttpResponse::Ok().body("OK")
+        HttpResponse::Ok().body("Todo Deleted")
     }
 }
 
