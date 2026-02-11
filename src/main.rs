@@ -5,6 +5,7 @@ use actix_web::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{Executor, SqlitePool, prelude::FromRow};
+use validator::Validate;
 
 #[derive(Serialize, FromRow)]
 struct Todo {
@@ -12,8 +13,13 @@ struct Todo {
     content: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 struct NewTodo {
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Content cannot be empty or over 100 chars"
+    ))]
     content: String,
 }
 
@@ -44,6 +50,10 @@ async fn get_todo_list(pool: web::Data<SqlitePool>) -> impl Responder {
 }
 
 async fn add_todo(todo: Json<NewTodo>, pool: web::Data<SqlitePool>) -> impl Responder {
+    if let Err(e) = todo.validate() {
+        return HttpResponse::BadRequest().json(e);
+    }
+
     sqlx::query("INSERT INTO todo (content) VALUES (?1)")
         .bind(&todo.content)
         .execute(pool.get_ref())
