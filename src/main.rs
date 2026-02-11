@@ -29,7 +29,7 @@ async fn db() -> SqlitePool {
         )",
     )
     .await
-    .expect("Failed to create table due to syntax error");
+    .expect("Failed to create table due to syntax error...");
     pool
 }
 
