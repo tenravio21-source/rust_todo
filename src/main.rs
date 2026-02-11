@@ -38,7 +38,9 @@ async fn get_todo_list(pool: web::Data<SqlitePool>) -> impl Responder {
         .fetch_all(pool.get_ref())
         .await
         .unwrap();
-    web::Json(todos)
+    let todo_json = serde_json::to_string(&todos).unwrap();
+
+    HttpResponse::Ok().body(todo_json)
 }
 
 async fn add_todo(todo: Json<NewTodo>, pool: web::Data<SqlitePool>) -> impl Responder {
